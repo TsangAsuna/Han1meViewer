@@ -74,5 +74,7 @@ object SettingsPreferenceKeys {
     const val MPV_TLS_VERIFY = "mpv_tls_verify"
     const val MPV_NETWORK_TIMEOUT = "mpv_network_timeout"
     const val CUSTOM_PARAMS = "mpv_custom_parameters"
+    /** 超分辨率（Anime4K）档位：0=关 1=效率(性能) 2=质量，跨视频持久化 */
+    const val SUPER_RESOLUTION_LEVEL = "mpv_super_resolution_level"
     const val LAST_UPDATE_POPUP_TIME = "last_update_popup_time"
 }

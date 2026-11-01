@@ -404,6 +404,15 @@ object Preferences {
     val mpvHwdec: String  // 硬件解码
         get() = preferenceSp.getString(SettingsPreferenceKeys.MPV_HWDEC, "Auto")?: "Auto"
 
+    /**
+     * 超分辨率（Anime4K）档位：0=关 1=效率(性能) 2=质量。
+     * 持久化到 SharedPreferences，供 MpvMediaKernel 在每次文件加载后重放，
+     * 解决"换视频/换内核后滤镜丢失"的问题。
+     */
+    var superResolutionLevel: Int
+        get() = preferenceSp.getInt(SettingsPreferenceKeys.SUPER_RESOLUTION_LEVEL, 0)
+        set(value) = preferenceSp.edit().putInt(SettingsPreferenceKeys.SUPER_RESOLUTION_LEVEL, value).apply()
+
     val mpvCacheSecs: Int  // 预缓存秒数
         get() = preferenceSp.getInt(SettingsPreferenceKeys.MPV_CACHE_SECS, 60)
 

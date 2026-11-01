@@ -228,9 +228,16 @@ class HJzvdStd @JvmOverloads constructor(
         context.getString(R.string.super_resolution_performance),
         context.getString(R.string.super_resolution_quality)
     )
-    private var superResolutionIndex = 0
+    /**
+     * 超分辨率（Anime4K）档位，持久化到 [Preferences.superResolutionLevel]：
+     * - 初始值从持久层读取（此前每次进播放页都被重置为"关闭"，用户感知即"没应用上"）；
+     * - set 时写回持久层；新建的 MpvMediaKernel 会在 MPV_EVENT_FILE_LOADED
+     *   时读取同一条目自动重放滤镜，即使本 View 已销毁也能恢复。
+     */
+    private var superResolutionIndex = Preferences.superResolutionLevel
         set(value) {
             field = value
+            Preferences.superResolutionLevel = value
             if (value != DEF_SUPER_RESOLUTION_INDEX) {
                 superResolution.text = getSuperResolutionArray()[value]
             } else {

@@ -52,6 +52,15 @@ object AnimeShaders {
                     }
                 }
             }
+
+            // 清理孤儿文件：App 升级后 assets 里已删除的 shader 不应残留在磁盘上，
+            // 否则 getShader 拼出的路径列表会引用不存在/过期的文件。
+            val assetSet = assetFiles.toHashSet()
+            targetDir.listFiles { f -> f.isFile }?.forEach { f ->
+                if (f.name !in assetSet) {
+                    f.delete()
+                }
+            }
             return copiedCount
         } catch (e: IOException) {
             e.printStackTrace()
@@ -79,6 +88,14 @@ object AnimeShaders {
             File(shadersDir, shaderFile).absolutePath
         }
     }
+
+    /**
+     * 超分辨率档位枚举，替代魔法 int（0=关 1=效率 2=质量），
+     * 与 Preferences.superResolutionLevel 及 HJzvdStd 的字符串数组索引保持一致。
+     */
+    const val SR_LEVEL_OFF = 0
+    const val SR_LEVEL_PERFORMANCE = 1
+    const val SR_LEVEL_QUALITY = 2
 
     fun copyCertAssets(context: Context): Int{
         try {

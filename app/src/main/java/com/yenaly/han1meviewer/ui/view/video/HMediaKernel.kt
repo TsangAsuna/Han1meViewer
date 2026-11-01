@@ -43,6 +43,7 @@ import com.yenaly.han1meviewer.util.AnimeShaders
 import com.yenaly.han1meviewer.util.AnimeShaders.getCert
 import com.yenaly.han1meviewer.ui.component.GlobalToasts
 import `is`.xyz.mpv.MPVLib
+import `is`.xyz.mpv.MPVNode
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicReference
@@ -540,6 +541,10 @@ class MpvMediaKernel(jzvd: Jzvd) : JZMediaInterface(jzvd) {
             })
 
             // 解码方式：选择合适的解码器（mediacodec/mediacodec-copy）
+            // mpv 官方惯例（见 mpv-android MPVActivity.pickDecoder）：
+            //   HW+  = mediacodec        直连零拷贝，帧不经过 GL 管线，glsl-shaders/Anime4K 不生效
+            //   HW   = mediacodec-copy   解码后回拷内存，帧走 vo=gpu GL 管线，滤镜可用
+            // 故要用 Anime4K 必须处于 copy 模式（或 SW）
             put("hwdec", when (Preferences.mpvHwdec) {
                 "Auto" -> "auto"
                 "HW" -> "mediacodec-copy"
@@ -595,13 +600,13 @@ class MpvMediaKernel(jzvd: Jzvd) : JZMediaInterface(jzvd) {
 
 
     private val observedProperties = listOf(
-        "time-pos" to MPVLib.mpvFormat.MPV_FORMAT_DOUBLE, // 当前播放时间（秒，带小数）
-        "duration" to MPVLib.mpvFormat.MPV_FORMAT_DOUBLE, // 视频总时长（秒）
-        "pause" to MPVLib.mpvFormat.MPV_FORMAT_FLAG,      // 是否暂停（true/false）
-        "playback-active" to MPVLib.mpvFormat.MPV_FORMAT_FLAG, // 播放是否处于活动状态
-        "video-params/w" to MPVLib.mpvFormat.MPV_FORMAT_INT64, // 视频宽度（像素）
-        "video-params/h" to MPVLib.mpvFormat.MPV_FORMAT_INT64, // 视频高度（像素）
-        "demuxer-cache-duration" to MPVLib.mpvFormat.MPV_FORMAT_DOUBLE
+        "time-pos" to MPVLib.MpvFormat.MPV_FORMAT_DOUBLE, // 当前播放时间（秒，带小数）
+        "duration" to MPVLib.MpvFormat.MPV_FORMAT_DOUBLE, // 视频总时长（秒）
+        "pause" to MPVLib.MpvFormat.MPV_FORMAT_FLAG,      // 是否暂停（true/false）
+        "playback-active" to MPVLib.MpvFormat.MPV_FORMAT_FLAG, // 播放是否处于活动状态
+        "video-params/w" to MPVLib.MpvFormat.MPV_FORMAT_INT64, // 视频宽度（像素）
+        "video-params/h" to MPVLib.MpvFormat.MPV_FORMAT_INT64, // 视频高度（像素）
+        "demuxer-cache-duration" to MPVLib.MpvFormat.MPV_FORMAT_DOUBLE
     )
     fun parseCustomMpvParams(): LinkedHashMap<String, String> {
         val rawInput = Preferences.customMpvParams
@@ -626,13 +631,19 @@ class MpvMediaKernel(jzvd: Jzvd) : JZMediaInterface(jzvd) {
     fun init() {
         mpvOptions.forEach { (key, value) ->
             Log.i("MPV_config","$key,$value")
-            MPVLib.setOptionString(key, value)
+            // 运行时用 property 语义写入：mpv 0.21+ 上 mpv_set_option 在初始化后
+            // 等价于 mpv_set_property，可正常生效；初始化前的设置则充当预配置。
+            if (MPVLib.setOptionString(key, value) < 0) {
+                Log.w(TAG, "mpv option rejected: $key=$value")
+            }
         }
         try {
             val customParams = parseCustomMpvParams()
             customParams.forEach { (key, value) ->
                 Log.i("MPV_config","custom: $key,$value")
-                MPVLib.setOptionString(key, value)
+                if (MPVLib.setOptionString(key, value) < 0) {
+                    Log.w(TAG, "custom mpv option rejected: $key=$value")
+                }
             }
         } catch (e: Exception){
             GlobalToasts.show(e.message.orEmpty(), level = GlobalToasts.ToastLevel.ERROR)
@@ -713,9 +724,12 @@ class MpvMediaKernel(jzvd: Jzvd) : JZMediaInterface(jzvd) {
         val uri = url.toUri()
         val path = prepareUri(jzvd.context, uri)
         if (path != null) {
-            MPVLib.command(arrayOf("loadfile", path))
+            // 先 attachSurface（设置 wid），再 loadfile：
+            // wid 在播放开始时读取，若文件先加载而 surface 后挂，
+            // 首帧可能输出到无效窗口（黑屏/无画面），之后再补救渲染。
             val surfaceTexture = jzvd.textureView?.surfaceTexture
             surfaceTexture?.let { MPVLib.attachSurface(Surface(it)) }
+            MPVLib.command("loadfile", path)
         }
     }
 
@@ -733,18 +747,18 @@ class MpvMediaKernel(jzvd: Jzvd) : JZMediaInterface(jzvd) {
 
     override fun isPlaying(): Boolean {
         val pause = MPVLib.getPropertyBoolean("pause")
-        return !pause
+        return pause == false
     }
 
     override fun seekTo(time: Long) {
         Log.i("seekTo","${ (time / 1000.0)}")
-        MPVLib.command(arrayOf("seek", (time / 1000.0).toString(), "absolute", "exact"))
+        MPVLib.command("seek", (time / 1000.0).toString(), "absolute", "exact")
     }
 
     override fun release() {
         clearSuperResolution()
         MPVLib.setPropertyBoolean("pause", true)
-        MPVLib.command(arrayOf("loadfile", "", "replace"))
+        MPVLib.command("loadfile", "", "replace")
         MPVLib.setPropertyString("vo", "null")
         MPVLib.setOptionString("force-window", "no")
         MPVLib.detachSurface()
@@ -775,7 +789,11 @@ class MpvMediaKernel(jzvd: Jzvd) : JZMediaInterface(jzvd) {
     }
 
     override fun setSurface(surface: Surface?) {
-        MPVLib.attachSurface(surface)
+        if (surface != null) {
+            MPVLib.attachSurface(surface)
+        } else {
+            MPVLib.detachSurface()
+        }
     }
 
     override fun onSurfaceTextureAvailable(surfaceTexture: SurfaceTexture, width: Int, height: Int) {
@@ -803,12 +821,26 @@ class MpvMediaKernel(jzvd: Jzvd) : JZMediaInterface(jzvd) {
 
 
     private fun clearSuperResolution() {
-        MPVLib.command(arrayOf("change-list", "glsl-shaders", "clr", ""))
+        MPVLib.command("change-list", "glsl-shaders", "clr", "")
     }
+
+    /**
+     * 应用/清除超分辨率滤镜。
+     * index: 0=关闭 1=效率(性能) 2=质量 —— 与 [AnimeShaders.getShader] 的 type 对应。
+     *
+     * 注意 hwdec 为直连模式（mediacodec/vulkan）时帧不经过 GL 管线，
+     * glsl-shaders 会静默无效；此时提示用户切换到 copy 模式解码（HW）或软解。
+     */
     fun setSuperResolution(index: Int) {
         if (index != 0) {
+            val hwdec = MPVLib.getPropertyString("hwdec-current")
+            if (hwdec != null && hwdec != "no" && !hwdec.endsWith("-copy")) {
+                Log.w(TAG, "hwdec=$hwdec is a direct mode; glsl-shaders (Anime4K) will NOT apply. " +
+                        "Switch decoder to HW (copy) or SW to enable filters.")
+                GlobalToasts.show("当前硬解为直连模式，滤镜不生效；请把解码切到 HW(copy) 或 SW")
+            }
             val cmd = arrayOf("change-list", "glsl-shaders", "set", AnimeShaders.getShader(jzvd.context, index))
-            MPVLib.command(cmd)
+            MPVLib.command(*cmd)
         } else {
             clearSuperResolution()
         }
@@ -849,35 +881,58 @@ class MpvMediaKernel(jzvd: Jzvd) : JZMediaInterface(jzvd) {
 
         }
 
+        override fun eventProperty(property: String, value: MPVNode) {
+//            Log.d(TAG, "eventProperty: $property node")
+        }
+
         override fun event(eventId: Int) {
             handler.post {
                 when (eventId) {
-                    MPVLib.mpvEventId.MPV_EVENT_START_FILE -> {
+                    MPVLib.MpvEvent.MPV_EVENT_START_FILE -> {
                         // 文件开始加载
                         mpvTimePos = 0.0
                         mpvCacheDuration = 0.0
                         mpvDuration = 0.0
                         jzvd.onStatePreparing()
                     }
-                    MPVLib.mpvEventId.MPV_EVENT_FILE_LOADED -> {
+                    MPVLib.MpvEvent.MPV_EVENT_FILE_LOADED -> {
                         // 文件加载成功
                         jzvd.onPrepared()
                         MPVLib.setPropertyDouble("speed", defaultSpeed.toDouble())
+                        // 每个新文件都重放一次超分设置：mpv 的 glsl-shaders
+                        // 跟随 VO/文件生命周期，换文件后必须重新 set，否则滤镜丢失。
+                        applyPersistedSuperResolution()
                     }
-                    MPVLib.mpvEventId.MPV_EVENT_PLAYBACK_RESTART -> {
+                    MPVLib.MpvEvent.MPV_EVENT_PLAYBACK_RESTART -> {
                         // 播放重新开始
                         jzvd.onStatePlaying()
                     }
-                    MPVLib.mpvEventId.MPV_EVENT_END_FILE -> {
+                    MPVLib.MpvEvent.MPV_EVENT_END_FILE -> {
                         // 播放结束
                         releaseCurrentPfd("MPV_EVENT_END_FILE")
                         jzvd.onCompletion()
                     }
-                    MPVLib.mpvEventId.MPV_EVENT_SHUTDOWN -> {
+                    MPVLib.MpvEvent.MPV_EVENT_SHUTDOWN -> {
                         Log.e(TAG, "event: $eventId")
                     }
                 }
             }
+        }
+    }
+
+    /**
+     * 读取持久化的超分档位并应用到当前 mpv 实例。
+     * 由 MPV_EVENT_FILE_LOADED 触发（换视频/重建 kernel 后自动恢复滤镜）。
+     */
+    private fun applyPersistedSuperResolution() {
+        try {
+            val index = Preferences.superResolutionLevel
+            if (index != 0) {
+                val cmd = arrayOf("change-list", "glsl-shaders", "set", AnimeShaders.getShader(jzvd.context, index))
+                MPVLib.command(*cmd)
+            }
+        } catch (e: Exception) {
+            Log.w(TAG, "applyPersistedSuperResolution failed", e)
         }
     }
 }
