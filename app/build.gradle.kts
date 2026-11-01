@@ -54,9 +54,13 @@ android {
     signingConfigs {
         create("release") {
             storeFile = file(System.getenv("HOME") + "/.android/keystore.jks")
+            // CI 无签名 secrets 时回退到 workflow 生成的一次性 keystore 口令
             storePassword = System.getenv("KEYSTORE_PASSWORD")
+                ?: System.getenv("FALLBACK_KEYSTORE_PASSWORD")
             keyAlias = System.getenv("KEY_ALIAS")
+                ?: System.getenv("FALLBACK_KEY_ALIAS")
             keyPassword = System.getenv("KEYSTORE_PASSWORD")
+                ?: System.getenv("FALLBACK_KEYSTORE_PASSWORD")
         }
     }
 

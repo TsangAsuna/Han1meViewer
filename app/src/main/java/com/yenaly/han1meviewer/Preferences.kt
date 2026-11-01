@@ -389,8 +389,8 @@ object Preferences {
     val mpvProfile: String // 预设模式
         get() = preferenceSp.getString(SettingsPreferenceKeys.MPV_PROFILE, "fast") ?: "fast"
 
-    val enableGPUNextRenderer: Boolean // gpu-next 渲染器
-        get() = preferenceSp.getBoolean(SettingsPreferenceKeys.ENABLE_GPU_NEXT_RENDERER, false)
+    val enableGPUNextRenderer: Boolean // gpu-next 渲染器（libplacebo，glsl-shaders 兼容性更好，默认开启）
+        get() = preferenceSp.getBoolean(SettingsPreferenceKeys.ENABLE_GPU_NEXT_RENDERER, true)
 
     val mpvInterpolation: Boolean  // 插帧相关
         get() = preferenceSp.getBoolean(SettingsPreferenceKeys.MPV_INTERPOLATION, false)

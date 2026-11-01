@@ -22,7 +22,6 @@ import com.yenaly.han1meviewer.util.ThemeUtils
 import com.developer.crashx.config.CrashConfig
 import com.yenaly.yenaly_libs.base.YenalyApplication
 import com.yenaly.yenaly_libs.utils.LanguageHelper
-import `is`.xyz.mpv.MPVLib
 import java.net.ProxySelector
 
 /**
@@ -84,8 +83,9 @@ class HanimeApplication : YenalyApplication() {
         HProxySelector.rebuildNetwork()
         initFirebase()
         initNotificationChannel()
-        MPVLib.create(applicationContext)
-        MPVLib.init()
+        // v0.1.12: MPV 实例化会话由 MpvMediaKernel 首次 prepare 时懒创建
+        // （MpvMediaKernel.obtainMpv），Application 层不再全局初始化，
+        // 避免未使用 MPV 内核的用户付出启动开销。
 
         if (AnimeShaders.copyShaderAssets(applicationContext) <= 0) {
             Log.w(TAG, "Shader 复制失败")
