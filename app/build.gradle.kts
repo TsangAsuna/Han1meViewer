@@ -54,13 +54,13 @@ android {
     signingConfigs {
         create("release") {
             storeFile = file(System.getenv("HOME") + "/.android/keystore.jks")
-            // CI 无签名 secrets 时回退到 workflow 生成的一次性 keystore 口令
-            storePassword = System.getenv("KEYSTORE_PASSWORD")
-                ?: System.getenv("FALLBACK_KEYSTORE_PASSWORD")
-            keyAlias = System.getenv("KEY_ALIAS")
-                ?: System.getenv("FALLBACK_KEY_ALIAS")
-            keyPassword = System.getenv("KEYSTORE_PASSWORD")
-                ?: System.getenv("FALLBACK_KEYSTORE_PASSWORD")
+            // CI 无签名 secrets 时回退到 workflow 生成的一次性 keystore 口令;
+            // getenv 返回空串也按缺失处理 (CI env 注入空值时 ?: 不会触发)
+            fun envOr(vararg names: String): String? =
+                names.map { System.getenv(it) }.firstOrNull { !it.isNullOrBlank() }
+            storePassword = envOr("KEYSTORE_PASSWORD", "FALLBACK_KEYSTORE_PASSWORD")
+            keyAlias = envOr("KEY_ALIAS", "FALLBACK_KEY_ALIAS")
+            keyPassword = envOr("KEYSTORE_PASSWORD", "FALLBACK_KEYSTORE_PASSWORD")
         }
     }
 
