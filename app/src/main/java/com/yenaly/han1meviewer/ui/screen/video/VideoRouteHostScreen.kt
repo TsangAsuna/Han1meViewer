@@ -77,6 +77,7 @@ import com.yenaly.han1meviewer.ui.view.video.HanimeDataSource
 import com.yenaly.han1meviewer.ui.view.video.VideoPlayerAppBarBehavior
 import com.yenaly.han1meviewer.ui.viewmodel.CommentViewModel
 import com.yenaly.han1meviewer.ui.viewmodel.VideoViewModel
+import com.yenaly.han1meviewer.util.FirebaseGate
 import com.yenaly.han1meviewer.util.checkBadGuy
 import com.yenaly.han1meviewer.util.loadAssetAs
 import com.yenaly.yenaly_libs.utils.OrientationManager
@@ -700,9 +701,11 @@ fun VideoRouteHostScreen(
                     title,
                     HKeyframeEntity.Keyframe(position = currentPosition, prompt = null),
                 )
-                Firebase.analytics.logEvent(FirebaseAnalytics.Event.SELECT_CONTENT) {
-                    param(FirebaseAnalytics.Param.ITEM_ID, FirebaseConstants.H_KEYFRAMES)
-                    param(FirebaseAnalytics.Param.CONTENT_TYPE, FirebaseConstants.H_KEYFRAMES)
+                FirebaseGate.guarded(activity) {
+                    Firebase.analytics.logEvent(FirebaseAnalytics.Event.SELECT_CONTENT) {
+                        param(FirebaseAnalytics.Param.ITEM_ID, FirebaseConstants.H_KEYFRAMES)
+                        param(FirebaseAnalytics.Param.CONTENT_TYPE, FirebaseConstants.H_KEYFRAMES)
+                    }
                 }
                 showAddHKeyframeDialog = null
             },

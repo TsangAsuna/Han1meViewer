@@ -18,6 +18,7 @@ import com.yenaly.han1meviewer.logic.network.HProxySelector
 import com.yenaly.han1meviewer.ui.viewmodel.AppViewModel
 import com.yenaly.han1meviewer.ui.activity.MainActivity
 import com.yenaly.han1meviewer.util.AnimeShaders
+import com.yenaly.han1meviewer.util.FirebaseGate
 import com.yenaly.han1meviewer.util.ThemeUtils
 import com.developer.crashx.config.CrashConfig
 import com.yenaly.yenaly_libs.base.YenalyApplication
@@ -98,34 +99,44 @@ class HanimeApplication : YenalyApplication() {
     }
 
     private fun initFirebase() {
-        // 用于处理 Firebase Analytics 初始化
-        Firebase.analytics.setAnalyticsCollectionEnabled(Preferences.isAnalyticsEnabled)
-        // 用于处理 Firebase Crashlytics 初始化
-        Firebase.crashlytics.apply {
-            isCrashlyticsCollectionEnabled = !BuildConfig.DEBUG
-            setCustomKeys {
-                key(
-                    FirebaseConstants.APP_LANGUAGE,
-                    LanguageHelper.preferredLanguage.toLanguageTag()
-                )
-                key(
-                    FirebaseConstants.VERSION_SOURCE,
-                    BuildConfig.VERSION_SOURCE
-                )
-            }
+        // 无有效 Firebase 配置（fork/CI 占位配置）时整体跳过：
+        // 继续调用会在后台线程触发 GMS IllegalArgumentException 崩溃
+        // （CrashX-CCF520F54DF2），且这些功能对本地构建本来也无意义。
+        if (!FirebaseGate.isEnabled(this)) {
+            Log.i(TAG, "Firebase disabled (no valid config); skipping all Firebase init.")
+            return
         }
-        // 用于处理 Firebase Remote Config 初始化
-        Firebase.remoteConfig.apply {
-            setConfigSettingsAsync(remoteConfigSettings {
-                minimumFetchIntervalInSeconds = if (BuildConfig.DEBUG) 0 else 3 * 60 * 60
-                fetchTimeoutInSeconds = 10
-            })
-            setDefaultsAsync(FirebaseConstants.remoteConfigDefaults)
-            fetchAndActivate().addOnCompleteListener {
-                AppViewModel.getLatestVersion(delayMillis = 200)
+
+        FirebaseGate.guarded(this) {
+            // 用于处理 Firebase Analytics 初始化
+            Firebase.analytics.setAnalyticsCollectionEnabled(Preferences.isAnalyticsEnabled)
+            // 用于处理 Firebase Crashlytics 初始化
+            Firebase.crashlytics.apply {
+                isCrashlyticsCollectionEnabled = !BuildConfig.DEBUG
+                setCustomKeys {
+                    key(
+                        FirebaseConstants.APP_LANGUAGE,
+                        LanguageHelper.preferredLanguage.toLanguageTag()
+                    )
+                    key(
+                        FirebaseConstants.VERSION_SOURCE,
+                        BuildConfig.VERSION_SOURCE
+                    )
+                }
             }
+            // 用于处理 Firebase Remote Config 初始化
+            Firebase.remoteConfig.apply {
+                setConfigSettingsAsync(remoteConfigSettings {
+                    minimumFetchIntervalInSeconds = if (BuildConfig.DEBUG) 0 else 3 * 60 * 60
+                    fetchTimeoutInSeconds = 10
+                })
+                setDefaultsAsync(FirebaseConstants.remoteConfigDefaults)
+                fetchAndActivate().addOnCompleteListener {
+                    AppViewModel.getLatestVersion(delayMillis = 200)
+                }
+            }
+            Firebase.database.setPersistenceEnabled(true)
         }
-        Firebase.database.setPersistenceEnabled(true)
     }
 
     private fun initNotificationChannel() {

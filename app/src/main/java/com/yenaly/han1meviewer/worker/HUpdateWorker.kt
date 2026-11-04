@@ -31,6 +31,7 @@ import com.yenaly.han1meviewer.R
 import com.yenaly.han1meviewer.UPDATE_NOTIFICATION_CHANNEL
 import com.yenaly.han1meviewer.logic.model.github.Latest
 import com.yenaly.han1meviewer.logic.network.HUpdater
+import com.yenaly.han1meviewer.util.FirebaseGate
 import com.yenaly.han1meviewer.util.installApkPackage
 import com.yenaly.han1meviewer.util.runSuspendCatching
 import com.yenaly.han1meviewer.util.updateFile
@@ -133,9 +134,11 @@ class HUpdateWorker(
             // 通告栏里只放翻译好的具体原因
             error.printStackTrace()
             val diagnostic = HUpdater.errorDetail(error)
-            Firebase.crashlytics.recordException(
-                if (diagnostic != null) IllegalStateException(diagnostic, error) else error
-            )
+            FirebaseGate.guarded(context) {
+                Firebase.crashlytics.recordException(
+                    if (diagnostic != null) IllegalStateException(diagnostic, error) else error
+                )
+            }
             file.delete()
             cancelDownloadNotification()
             showFailureNotification(error)

@@ -11,6 +11,7 @@ import com.yenaly.han1meviewer.Preferences
 import com.yenaly.han1meviewer.logic.NetworkRepo
 import com.yenaly.han1meviewer.logic.model.github.Latest
 import com.yenaly.han1meviewer.logic.state.WebsiteState
+import com.yenaly.han1meviewer.util.FirebaseGate
 import com.yenaly.han1meviewer.worker.HUpdateWorker
 import com.yenaly.han1meviewer.worker.HanimeDownloadManagerV2
 import com.yenaly.han1meviewer.worker.HanimeDownloadWorker
@@ -56,8 +57,10 @@ object AppViewModel : YenalyViewModel(application), IHCsrfToken {
         viewModelScope.launch(Dispatchers.Main) {
             Preferences.loginStateFlow.collect { isLogin ->
                 Log.d("LoginState", "isLogin: $isLogin")
-                Firebase.crashlytics.setCustomKeys {
-                    key(FirebaseConstants.LOGIN_STATE, isLogin)
+                FirebaseGate.guarded(application) {
+                    Firebase.crashlytics.setCustomKeys {
+                        key(FirebaseConstants.LOGIN_STATE, isLogin)
+                    }
                 }
             }
         }
@@ -70,8 +73,10 @@ object AppViewModel : YenalyViewModel(application), IHCsrfToken {
             HanimeDownloadWorker.getRunningWorkInfoCount(application).collect { count ->
                 Log.d(HanimeDownloadWorker.TAG, "getRunningWorkInfoCount: $count")
                 runningWorkInfoCountFlow.value = count
-                Firebase.crashlytics.setCustomKeys {
-                    key(FirebaseConstants.RUNNING_DOWNLOAD_WORK_COUNT, count)
+                FirebaseGate.guarded(application) {
+                    Firebase.crashlytics.setCustomKeys {
+                        key(FirebaseConstants.RUNNING_DOWNLOAD_WORK_COUNT, count)
+                    }
                 }
             }
         }

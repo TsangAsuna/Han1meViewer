@@ -72,6 +72,7 @@ import com.yenaly.han1meviewer.ui.screen.home.homepage.homeCategoryOrder
 import com.yenaly.han1meviewer.ui.screen.home.homepage.saveHomeCategoryPreferences
 import com.yenaly.han1meviewer.ui.theme.ThemeColorPreset
 import com.yenaly.han1meviewer.ui.viewmodel.AppViewModel
+import com.yenaly.han1meviewer.util.FirebaseGate
 import com.yenaly.han1meviewer.util.ThemeUtils
 import com.yenaly.yenaly_libs.ActivityManager
 import com.yenaly.yenaly_libs.utils.applicationContext
@@ -351,7 +352,9 @@ fun HomeSettingsRouteScreen(
             }
             saveBoolean(HOME_USE_ANALYTICS, true)
             refreshKey++
-            Firebase.analytics.setAnalyticsCollectionEnabled(true)
+            FirebaseGate.guarded(context) {
+                Firebase.analytics.setAnalyticsCollectionEnabled(true)
+            }
         },
         onUseLockScreenChange = { value ->
             if (value) {
@@ -498,7 +501,9 @@ fun HomeSettingsRouteScreen(
                 TextButton(onClick = {
                     saveBoolean(HOME_USE_ANALYTICS, false)
                     refreshKey++
-                    Firebase.analytics.setAnalyticsCollectionEnabled(false)
+                    FirebaseGate.guarded(context) {
+                        Firebase.analytics.setAnalyticsCollectionEnabled(false)
+                    }
                     showAnalyticsDialog = false
                 }) {
                     Text(stringResource(R.string.deny))

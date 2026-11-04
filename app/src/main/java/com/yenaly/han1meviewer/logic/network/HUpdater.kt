@@ -9,6 +9,7 @@ import com.yenaly.han1meviewer.Preferences
 import com.yenaly.han1meviewer.logic.exception.HUpdaterException
 import com.yenaly.han1meviewer.logic.model.github.CommitComparison
 import com.yenaly.han1meviewer.logic.model.github.Latest
+import com.yenaly.han1meviewer.util.FirebaseGate
 import com.yenaly.han1meviewer.util.checkNeedUpdate
 import com.yenaly.han1meviewer.util.copyTo
 import com.yenaly.han1meviewer.util.runSuspendCatching
@@ -81,6 +82,12 @@ object HUpdater {
      */
     private fun currentChannel(): Channel {
         if (!Preferences.useCIUpdateChannel) return Channel.RELEASE
+        // 无有效 Firebase 配置时 Remote Config 不可用，直接回落 RELEASE 频道，
+        // 不抛错（fork/CI 构建场景，CrashX-CCF520F54DF2 同源问题）
+        if (!FirebaseGate.canUse(applicationContext)) {
+            Log.i(TAG, "Firebase disabled; falling back to RELEASE channel.")
+            return Channel.RELEASE
+        }
         // Remote Config 未初始化完成时读取会抛异常，这里不再吞掉并回落到 Release，
         // 而是作为一次明确的失败上报（界面提示具体原因，用户可手动重试）
         val ciEnabled = try {

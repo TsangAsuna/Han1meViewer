@@ -13,12 +13,15 @@ fun Activity.logScreenViewEvent(fragment: Fragment) {
 }
 
 fun Activity.logScreenViewEvent(screenClassName: String) {
-    Firebase.analytics.logEvent(FirebaseAnalytics.Event.SCREEN_VIEW) {
-        // example: MainActivity-HomeRouteScreen
-        val screenName = this@logScreenViewEvent.javaClass.simpleName +
-            "-" + screenClassName
-        Log.d("logScreenViewEvent", "screenName: $screenName")
-        param(FirebaseAnalytics.Param.SCREEN_NAME, screenName)
-        param(FirebaseAnalytics.Param.SCREEN_CLASS, screenClassName)
+    // 无有效 Firebase 配置时直接跳过，避免 GMS 后台线程崩溃
+    FirebaseGate.guarded(this) {
+        Firebase.analytics.logEvent(FirebaseAnalytics.Event.SCREEN_VIEW) {
+            // example: MainActivity-HomeRouteScreen
+            val screenName = this@logScreenViewEvent.javaClass.simpleName +
+                "-" + screenClassName
+            Log.d("logScreenViewEvent", "screenName: $screenName")
+            param(FirebaseAnalytics.Param.SCREEN_NAME, screenName)
+            param(FirebaseAnalytics.Param.SCREEN_CLASS, screenClassName)
+        }
     }
 }
