@@ -99,9 +99,13 @@ class HanimeApplication : YenalyApplication() {
     }
 
     private fun initFirebase() {
-        // 无有效 Firebase 配置（fork/CI 占位配置）时整体跳过：
+        // 先按配置真伪决定是否手动初始化 FirebaseApp
+        // （FirebaseInitProvider 已在 manifest 中移除，SDK 不再自动初始化）
+        FirebaseGate.initializeIfConfigured(this)
+
+        // 无有效配置（fork/CI 占位配置）时整体跳过：
         // 继续调用会在后台线程触发 GMS IllegalArgumentException 崩溃
-        // （CrashX-CCF520F54DF2），且这些功能对本地构建本来也无意义。
+        // （CRASHX-CCF520F54DF2 / CRASHX-D15C365E8FCF）。
         if (!FirebaseGate.isEnabled(this)) {
             Log.i(TAG, "Firebase disabled (no valid config); skipping all Firebase init.")
             return

@@ -55,6 +55,27 @@
             android:foregroundServiceType="dataSync"
             tools:node="merge" />
 
+        <!--
+          移除 Firebase SDK 自带的自动初始化 ContentProvider。
+
+          原因：FirebaseInitProvider 会在 Application.onCreate 之前
+          (initOrder=100) 自动 FirebaseApp.initializeApp()，随后 Analytics /
+          Sessions / Crashlytics 在各自的线程池里直接调用服务端 API。
+          当 google-services.json 是占位配置（fork/CI/本地构建）时，GMS
+          Preconditions 会在后台线程抛 IllegalArgumentException:
+          "Please set a valid API key..." 直接崩溃
+          （CRASHX-CCF520F54DF2 / CRASHX-D15C365E8FCF）。
+
+          任何 Kotlin 侧守卫都拦不住这条路径，因为它在我们的代码之前就跑完了。
+
+          改由 HanimeApplication 在确认配置有效后手动 initializeApp()，
+          见 util/FirebaseGate.kt。占位配置下 Firebase 完全不会启动。
+        -->
+        <provider
+            android:name="com.google.firebase.provider.FirebaseInitProvider"
+            android:authorities="${applicationId}.firebaseinitprovider"
+            tools:node="remove" />
+
         <provider
             android:name="androidx.startup.InitializationProvider"
             android:authorities="${applicationId}.androidx-startup"

@@ -26,6 +26,25 @@ android {
 
     val commitSha = if (isRelease) lastCommitSha else "b8eace8" // 方便调试
 
+    /**
+     * 占位 Firebase 配置检测（fork / 本地 / CI 无 secrets 构建）。
+     *
+     * 注意：根治手段是 AndroidManifest.xml 中无条件
+     * `tools:node="remove"` 掉 FirebaseInitProvider + FirebaseGate 手动初始化，
+     * 这里只用于构建期提示，不参与配置逻辑。
+     */
+    val googleServicesFile = file("google-services.json")
+    val isPlaceholderFirebase = !googleServicesFile.exists() ||
+        runCatching {
+            googleServicesFile.readText().contains("AIzaSyPLACEHOLDER")
+        }.getOrDefault(true)
+    if (isPlaceholderFirebase) {
+        logger.lifecycle(
+            "[Firebase] Placeholder/absent google-services.json — " +
+                "Firebase will stay uninitialized at runtime (see FirebaseGate)."
+        )
+    }
+
     // 先 Github Secrets 再读取环境变量，若没有则读取本地文件
 
     val githubToken = System.getenv("HA_GITHUB_TOKEN") ?: File(
